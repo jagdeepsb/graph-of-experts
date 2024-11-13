@@ -83,13 +83,13 @@ class TreeNode(nn.Module):
         assert x.size(0) == 1, "Batch size must be 1 during inference"
         
         # During inference, pick the highest probability child
-        _, selected_child = torch.max(logits, dim=-1)
-        selected_child = selected_child.item()
+        _, should_go_left = torch.max(logits, dim=-1)
+        should_go_left = should_go_left.item() == 0
         
         # Override with deterministic selection
-        selected_child = self.should_go_left_mask(x_og).item()
+        should_go_left = self.should_go_left_mask(x_og).item() # bool
         
-        if selected_child == 0:
+        if should_go_left:
             value, sig = self.left_child.inference(my_output, x_og)
             return value, "L" + sig
         else:
