@@ -86,8 +86,13 @@ class TreeNode(nn.Module):
         _, should_go_left = torch.max(logits, dim=-1)
         should_go_left = should_go_left.item() == 0
         
+        probs = torch.softmax(logits, dim=-1)
+        # should_go_left = (torch.rand(1) < probs[0, 0]).item()
+        
+        print(logits, probs, should_go_left)
+        
         # Override with deterministic selection
-        should_go_left = self.should_go_left_mask(x_og).item() # bool
+        # should_go_left = self.should_go_left_mask(x_og).item() # bool
         
         if should_go_left:
             value, sig = self.left_child.inference(my_output, x_og)
@@ -112,9 +117,10 @@ class TreeNode(nn.Module):
         
         # Compute logits for the child selection distribution
         logits = self.child_selector(x)
+        probs = torch.softmax(logits, dim=-1)
         
         # Sample a soft selection using Gumbel-Softmax during training
-        probs = get_gumbel_probs(logits, self.temperature)
+        # probs = get_gumbel_probs(logits, self.temperature)
         
         should_go_left = self.should_go_left_mask(x_og)
         should_go_right = ~should_go_left
@@ -124,10 +130,10 @@ class TreeNode(nn.Module):
         right_loss = self.right_child.expected_loss(my_output, x_og, y_t, loss_fn)
         
         # Weighted average of left and right child losses
-        # combined_loss = probs[:, 0:1] * left_loss + probs[:, 1:2] * right_loss
+        combined_loss = probs[:, 0:1] * left_loss + probs[:, 1:2] * right_loss
         
         # Use deterministic selection
-        combined_loss = should_go_left * left_loss + should_go_right * right_loss
+        # combined_loss = should_go_left * left_loss + should_go_right * right_loss
         
         return combined_loss    
 
