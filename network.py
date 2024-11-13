@@ -52,45 +52,7 @@ class TreeNode(nn.Module):
         If eval mode, also returns a signature of the path taken.
         """
         
-        # Compute the node's output activation
-        my_output = self.output_layer(x)
-        
-        # If this is a leaf node, return the output
-        if self.is_leaf:
-            if self.training:
-                return my_output
-            else:
-                return my_output, ""
-        
-        # Compute logits for the child selection distribution
-        logits = self.child_selector(x)
-        
-        if self.training:
-            # Sample a soft selection using Gumbel-Softmax during training
-            probs = get_gumbel_probs(logits, self.temperature)
-            
-            # Recursively compute the children's outputs
-            left_output = self.left_child(my_output)
-            right_output = self.right_child(my_output)
-            
-            # Weighted average of left and right child outputs
-            combined_output = probs[:, 0:1] * left_output + probs[:, 1:2] * right_output
-            return combined_output
-        else:
-            # Assert that the batch size is 1 during inference, can't do routing otherwise
-            assert x.size(0) == 1, "Batch size must be 1 during inference"
-            
-            # During inference, pick the highest probability child
-            _, selected_child = torch.max(logits, dim=-1)
-            selected_child = selected_child.item()
-            # print(selected_child)
-            
-            if selected_child == 0:
-                value, sig = self.left_child(my_output)
-                return value, "L" + sig
-            else:
-                value, sig = self.right_child(my_output)
-                return value, "R" + sig
+        raise NotImplementedError("Use inference or expected_loss instead")
     
     def should_go_left_mask(self, x_og: torch.Tensor) -> torch.Tensor:
         if self.depth == 0:
@@ -124,6 +86,7 @@ class TreeNode(nn.Module):
         _, selected_child = torch.max(logits, dim=-1)
         selected_child = selected_child.item()
         
+        # Override with deterministic selection
         selected_child = self.should_go_left_mask(x_og).item()
         
         if selected_child == 0:
@@ -163,8 +126,7 @@ class TreeNode(nn.Module):
         # Weighted average of left and right child losses
         # combined_loss = probs[:, 0:1] * left_loss + probs[:, 1:2] * right_loss
         
-        # print(should_go_left.shape, should_go_right.shape, left_loss.shape, right_loss.shape)
-        # raise
+        # Use deterministic selection
         combined_loss = should_go_left * left_loss + should_go_right * right_loss
         
         return combined_loss    
