@@ -122,8 +122,8 @@ class TreeNode(nn.Module):
         # Sample a soft selection using Gumbel-Softmax during training
         # probs = get_gumbel_probs(logits, self.temperature)
         
-        should_go_left = self.should_go_left_mask(x_og)
-        should_go_right = ~should_go_left
+        # should_go_left = self.should_go_left_mask(x_og)
+        # should_go_right = ~should_go_left
         
         # Recursively compute the children's losses
         left_loss = self.left_child.expected_loss(my_output, x_og, y_t, loss_fn)

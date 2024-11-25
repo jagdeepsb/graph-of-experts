@@ -26,6 +26,22 @@ class PiecewiseFunction:
         
         # Handle the edge case where x == upper_bound
         return self.slopes[-1] * x + self.intercepts[-1]
+    
+class PolynomialFunction:
+    def __init__(self, coefficients):
+        self.coefficients = coefficients
+        
+    def __call__(self, x):
+        return sum([coeff * x ** i for i, coeff in enumerate(self.coefficients)])
+    
+class SinusoidalFunction:
+    def __init__(self, amplitude, frequency, phase):
+        self.amplitude = amplitude
+        self.frequency = frequency
+        self.phase = phase
+        
+    def __call__(self, x):
+        return self.amplitude * np.sin(self.frequency * x + self.phase)
 
 if __name__ == "__main__":
     piecewise_func = PiecewiseFunction(lower_bound=-1, upper_bound=1, num_splits=4)
