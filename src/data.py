@@ -40,6 +40,14 @@ class RotatedMNISTDataset(Dataset):
         # Apply rotation
         rotation_angle = self.rotations[rotation_idx]
         rotated_image = transforms.functional.rotate(image, rotation_angle)
+        
+        # cast image to tensor
+        rotated_image = transforms.functional.to_tensor(rotated_image)
+        
+        if rotation_idx == 0:
+            # invert the colors in the image
+            max_value = rotated_image.max()
+            rotated_image = max_value - rotated_image
 
         # Return image, rotation class, and original digit class
         return (

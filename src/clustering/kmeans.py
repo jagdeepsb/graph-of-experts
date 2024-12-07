@@ -47,10 +47,10 @@ class KMeansImageClusterer(KMeansClusterer):
         """
         
         features = []
-        for el in range(dataset):
+        for el in dataset:
             assert type(el) == tuple
             image = el[0]
-            assert type(image) == torch.Tensor
+            assert type(image) == torch.Tensor, f"Expected torch.Tensor, got {type(image)}"
             image = image.numpy()
             image = self.preprocess_image(image)
             
@@ -75,7 +75,6 @@ class KMeansImageClusterer(KMeansClusterer):
         ids = self.model.predict(features)
         return ids
         
-
     def preprocess_image(self, image: np.ndarray) -> np.ndarray:
         """
         image: numpy array of shape (C, H, W)
@@ -85,8 +84,12 @@ class KMeansImageClusterer(KMeansClusterer):
         # if the image has an alpha channel, remove it
         if image.shape[0] == 4:
             image = image[:3]
+            
+        # if the image is grayscale, remove the channel dimension
+        if image.shape[0] == 1:
+            image = image[0]
         
-        resized_image = cv2.resize(image, (4, 4), interpolation=cv2.INTER_LINEAR)
+        resized_image = cv2.resize(image, (4, 4), interpolation=cv2.INTER_CUBIC)
         return resized_image
     
     def debug(self, dataset: Dataset):
@@ -97,15 +100,16 @@ class KMeansImageClusterer(KMeansClusterer):
         """
         
         features, raw_images = [], []
-        for el in range(dataset):
+        for el in dataset:
             assert type(el) == tuple
             image = el[0]
             assert type(image) == torch.Tensor
             image = image.numpy()
-            image = self.preprocess_image(image)
+            raw_images.append(image.copy())
             
+            image = self.preprocess_image(image)
             features.append(image.flatten())
-            raw_images.append(image)
+            
             
         features = np.array(features)
         labels = self.model.predict(features)
@@ -120,7 +124,8 @@ class KMeansImageClusterer(KMeansClusterer):
         fig, axes = plt.subplots(self.n_clusters, n_per, figsize=(80, 80))
         for i in range(self.n_clusters):
             for j in range(n_per):
-                img = np.transpose(label_to_images[i][j], (1, 2, 0))
+                img = label_to_images[i][j]
+                img = np.transpose(img, (1, 2, 0))
                 img = (img + 1) / 2
                 axes[i, j].imshow(img)
                 axes[i, j].axis("off")
