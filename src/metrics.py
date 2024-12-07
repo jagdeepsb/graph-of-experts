@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torchprofile import profile_macs
 
-from torchprofile import profile_macs
 
 def get_model_flops(model, inputs):
     num_macs = profile_macs(model, inputs)
@@ -28,6 +27,7 @@ def get_model_sparsity(model: nn.Module) -> float:
         num_elements += param.numel()
     return 1 - float(num_nonzeros) / num_elements
 
+
 def get_num_parameters(model: nn.Module, count_nonzero_only=False) -> int:
     """
     calculate the total number of parameters of model
@@ -50,6 +50,7 @@ def get_model_size(model: nn.Module, data_width=32, count_nonzero_only=False) ->
     """
     return get_num_parameters(model, count_nonzero_only) * data_width
 
+
 Byte = 8
 KiB = 1024 * Byte
 MiB = 1024 * KiB
@@ -69,3 +70,4 @@ if __name__ == "__main__":
     print(get_model_sparsity(model))
     print(get_num_parameters(model))
     print(get_model_size(model))
+
