@@ -22,7 +22,7 @@ def map_emb_to_path(embs, depth):
     Then we return a map from each emb vector to the corresponding path.
     '''
     cluster_indices = hierarchical_kmeans(embs, depth)
-    return {i: get_binary_path(depth, cluster_indices[i]) for i in range(len(embs))}
+    return [get_binary_path(depth, cluster_indices[i]) for i in range(len(embs))]
 
 def hierarchical_kmeans(X, depth, current_level=0, cluster_indices=None):
     """

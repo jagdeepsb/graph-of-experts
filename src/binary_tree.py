@@ -3,6 +3,9 @@ from typing import Callable, List, Type
 
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset
+from src.clustering.kmeans import KMeansImageClusterer
+from src.router import map_emb_to_path
 
 
 class PretrainedBinaryTreeRouter(ABC):
@@ -30,21 +33,34 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
     def __init__(self, depth: int):
         self.depth = depth
-        self.codebook = []
+        self.clusterer = None
         self.emb_to_path = []
     
-    def compute_codebook(dataset: torch.Tensor):
+    def compute_codebook(self, dataset: Dataset):
         """
         Args:
-            dataset: Entire training dataset
+            dataset: expects (image, ...) tuples
         """
-        pass
+        self.clusterer = KMeansImageClusterer(n_clusters=2**(self.depth-1))
+        self.clusterer.fit(dataset)
+        
+        codebook = self.clusterer.cluster_centers() # shape (n_clusters, n_features)
+        codebook = torch.tensor(self.codebook)
+        
+        # Compute binary path for each codebook vector
+        self.emb_to_path = map_emb_to_path(codebook, self.depth)
         
     def get_path(self, x: torch.Tensor) -> torch.Tensor:
-        # TODO: Find corresponding codebook vector to x
-        emb_ix = None
+        """
+        x: (data_dim,)
+        """
         
-        return self.emb_to_path_map[emb_ix]
+        # add a batch dimension
+        x = x.unsqueeze(0)
+        labels = self.clusterer.predict(x)
+        emb_ix = labels[0].item()
+        
+        return self.emb_to_path[emb_ix]
 
 class BinaryTreeNode:
     def __init__(
