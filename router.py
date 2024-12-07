@@ -8,7 +8,7 @@ def get_binary_path(depth, i):
     a corresponding path in the graph
     '''
     # Convert `i` to binary and pad to `depth` bits
-    binary_representation = bin(i)[2:].zfill(depth)
+    binary_representation = bin(i)[2:].zfill(depth-1)
     
     # Convert the binary string to a list of integers
     binary_list = [int(bit) for bit in binary_representation]
@@ -29,7 +29,7 @@ def hierarchical_kmeans(X, depth, current_level=0, cluster_indices=None):
     Hierarchical K-Means Clustering for k=2, returning cluster indices.
     
     X: torch tensor of shape [n, d] (n points, each of dimension d)
-    depth: int, maximum depth of the hierarchy
+    depth: int, maximum depth of the hierarchy (depth - 1 iterations of clustering)
     current_level: int, the current depth in the hierarchy
     cluster_indices: torch tensor of shape [n], stores cluster indices of points
     
@@ -40,7 +40,7 @@ def hierarchical_kmeans(X, depth, current_level=0, cluster_indices=None):
         # Initialize cluster indices as 0 for all points
         cluster_indices = torch.zeros(X.shape[0], dtype=torch.int32)
 
-    if current_level == depth or X.shape[0] <= 1:
+    if current_level == depth - 1 or X.shape[0] <= 1:
         # Return the current cluster indices if depth is reached or only one point
         return cluster_indices
 
@@ -89,7 +89,7 @@ def hierarchical_spectral_clustering(X, depth, current_level=0, cluster_indices=
         # Initialize cluster indices as 0 for all points
         cluster_indices = torch.zeros(X.shape[0], dtype=torch.int32)
 
-    if current_level == depth or X.shape[0] <= 1:
+    if current_level == depth - 1 or X.shape[0] <= 1:
         # Return the current cluster indices if depth is reached or only one point
         return cluster_indices
 

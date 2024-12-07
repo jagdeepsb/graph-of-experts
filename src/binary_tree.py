@@ -28,9 +28,23 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
     Router which uses hierarchical clustering of learned (discrete) latent variable (using e.g., a VQ-VAE) to route data
     """
-
-    pass
-
+    def __init__(self, depth: int):
+        self.depth = depth
+        self.codebook = []
+        self.emb_to_path = []
+    
+    def compute_codebook(dataset: torch.Tensor):
+        """
+        Args:
+            dataset: Entire training dataset
+        """
+        pass
+        
+    def get_path(self, x: torch.Tensor) -> torch.Tensor:
+        # TODO: Find corresponding codebook vector to x
+        emb_ix = None
+        
+        return self.emb_to_path_map[emb_ix]
 
 class BinaryTreeNode:
     def __init__(
