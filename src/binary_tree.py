@@ -45,7 +45,7 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         self.clusterer.fit(dataset)
         
         codebook = self.clusterer.cluster_centers() # shape (n_clusters, n_features)
-        codebook = torch.tensor(self.codebook)
+        codebook = torch.tensor(codebook)
         
         # Compute binary path for each codebook vector
         self.emb_to_path = map_emb_to_path(codebook, self.depth)

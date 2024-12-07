@@ -122,30 +122,31 @@ def hierarchical_spectral_clustering(X, depth, current_level=0, cluster_indices=
 
     return cluster_indices
 
-# Example usage
-print('Test 1')
-depth = 4
-i = 7
-binary_tensor = get_binary_path(depth, i)
-print(binary_tensor)  # Outputs: tensor([0, 1, 1, 1])
+if __name__ == "__main__":
+    # Example usage
+    print('Test 1')
+    depth = 4
+    i = 7
+    binary_tensor = get_binary_path(depth, i)
+    print(binary_tensor)  # Outputs: tensor([0, 1, 1, 1])
 
-print('Test 2')
-# Generate some sample data as PyTorch tensors
-torch.manual_seed(42)
-X = torch.rand(8, 2)  # 100 points in 2D space
+    print('Test 2')
+    # Generate some sample data as PyTorch tensors
+    torch.manual_seed(42)
+    X = torch.rand(8, 2)  # 100 points in 2D space
 
-# Perform hierarchical k-means
-depth = 3  # Max depth of the hierarchy
-cluster_indices = hierarchical_kmeans(X, depth)
+    # Perform hierarchical k-means
+    depth = 3  # Max depth of the hierarchy
+    cluster_indices = hierarchical_kmeans(X, depth)
 
-# Print cluster indices
-print(cluster_indices)
+    # Print cluster indices
+    print(cluster_indices)
 
-print('Test 3')
-cluster_indices = hierarchical_spectral_clustering(X, depth)
+    print('Test 3')
+    cluster_indices = hierarchical_spectral_clustering(X, depth)
 
-# Print cluster indices
-print(cluster_indices)
+    # Print cluster indices
+    print(cluster_indices)
 
-print('Test 4')
-print(map_emb_to_path(X, depth))
+    print('Test 4')
+    print(map_emb_to_path(X, depth))
