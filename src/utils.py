@@ -18,5 +18,6 @@ class MLP(nn.Module):
         mlp = []
         for idx in range(len(self.unit_dims) - 1):
             mlp.append(nn.Linear(self.unit_dims[idx], self.unit_dims[idx + 1]))
-            mlp.append(self.activation())
+            if idx < len(self.unit_dims) - 2:
+                mlp.append(self.activation())
         return nn.Sequential(*mlp)
