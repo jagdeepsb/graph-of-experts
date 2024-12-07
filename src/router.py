@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from sklearn.cluster import KMeans
 from sklearn.cluster import SpectralClustering
@@ -54,69 +55,30 @@ def hierarchical_kmeans(X, depth, current_level=0, cluster_indices=None):
     # Assign points to clusters
     labels = torch.tensor(kmeans.labels_, dtype=torch.int32)
 
-    # Update cluster indices to reflect hierarchy level
-    cluster_indices += labels * (2 ** current_level)
-
     # Split data based on k-means labels
     cluster_1 = X[labels == 0]
     cluster_2 = X[labels == 1]
 
-    print(f'Split{current_level} into {len(cluster_1)} and {len(cluster_2)}')
+    points_to_move = max(len(cluster_1), len(cluster_2)) - 2**(depth-current_level-2)
+    if (points_to_move > 0):
+        centers = kmeans.cluster_centers_
+        bigger_cluster = 0 if len(cluster_1) > len(cluster_2) else 1
+        dist = np.sum((X_np - centers[bigger_cluster])**2, axis=1)
+        dist[labels == (1 - bigger_cluster)] = dist.min()
+        top_k_indices = np.argsort(dist)[-points_to_move:]
+        labels[top_k_indices] = 1 - labels[top_k_indices]
+        # Re-split data based on k-means labels
+        cluster_1 = X[labels == 0]
+        cluster_2 = X[labels == 1]
 
+    # Update cluster indices to reflect hierarchy level
+    cluster_indices += labels * (2 ** current_level)
+        
     # Recur for each cluster
     cluster_indices[labels == 0] = hierarchical_kmeans(
         cluster_1, depth, current_level + 1, cluster_indices[labels == 0]
     )
     cluster_indices[labels == 1] = hierarchical_kmeans(
-        cluster_2, depth, current_level + 1, cluster_indices[labels == 1]
-    )
-
-    return cluster_indices
-
-def hierarchical_spectral_clustering(X, depth, current_level=0, cluster_indices=None):
-    """
-    Hierarchical Spectral Clustering for k=2, returning cluster indices.
-    
-    X: torch tensor of shape [n, d] (n points, each of dimension d)
-    depth: int, maximum depth of the hierarchy
-    current_level: int, the current depth in the hierarchy
-    cluster_indices: torch tensor of shape [n], stores cluster indices of points
-    
-    Returns:
-        cluster_indices: torch tensor of shape [n], the cluster index of each point
-    """
-    if cluster_indices is None:
-        # Initialize cluster indices as 0 for all points
-        cluster_indices = torch.zeros(X.shape[0], dtype=torch.int32)
-
-    if current_level == depth - 1 or X.shape[0] <= 1:
-        # Return the current cluster indices if depth is reached or only one point
-        return cluster_indices
-
-    # Convert PyTorch tensor to NumPy array for sklearn SpectralClustering compatibility
-    X_np = X.numpy()
-
-    # Apply Spectral Clustering with k=2
-    spectral = SpectralClustering(n_clusters=2, affinity='nearest_neighbors', random_state=42, n_neighbors=X.shape[0]-1, assign_labels='discretize')
-    labels = spectral.fit_predict(X_np)
-
-    # Convert labels to a torch tensor
-    labels = torch.tensor(labels, dtype=torch.int32)
-
-    # Update cluster indices to reflect hierarchy level
-    cluster_indices += labels * (2 ** current_level)
-
-    # Split data based on spectral clustering labels
-    cluster_1 = X[labels == 0]
-    cluster_2 = X[labels == 1]
-
-    print(f'Split{current_level} into {len(cluster_1)} and {len(cluster_2)}')
-
-    # Recur for each cluster
-    cluster_indices[labels == 0] = hierarchical_spectral_clustering(
-        cluster_1, depth, current_level + 1, cluster_indices[labels == 0]
-    )
-    cluster_indices[labels == 1] = hierarchical_spectral_clustering(
         cluster_2, depth, current_level + 1, cluster_indices[labels == 1]
     )
 
@@ -136,17 +98,11 @@ if __name__ == "__main__":
     X = torch.rand(8, 2)  # 100 points in 2D space
 
     # Perform hierarchical k-means
-    depth = 3  # Max depth of the hierarchy
+    depth = 4  # Max depth of the hierarchy
     cluster_indices = hierarchical_kmeans(X, depth)
 
     # Print cluster indices
     print(cluster_indices)
 
     print('Test 3')
-    cluster_indices = hierarchical_spectral_clustering(X, depth)
-
-    # Print cluster indices
-    print(cluster_indices)
-
-    print('Test 4')
     print(map_emb_to_path(X, depth))
