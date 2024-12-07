@@ -22,7 +22,6 @@ class KMeansClusterer():
         X: numpy array of shape (n_samples, n_features)
         """
         self.model.fit(X)
-        self._cluster_centers = self.model.cluster_centers_ # shape (n_clusters, n_features)
         
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -33,6 +32,12 @@ class KMeansClusterer():
         ids = self.model.predict(X)
         # cluster_centers = self._cluster_centers[ids]
         return ids
+    
+    def cluster_centers(self) -> np.ndarray:
+        """
+        returns: numpy array of shape (n_clusters, n_features)
+        """
+        return self.model.cluster_centers_
     
 class KMeansImageClusterer(KMeansClusterer):
     def fit(self, dataset: Dataset):
