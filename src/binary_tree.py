@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 from src.clustering.kmeans import KMeansImageClusterer
-from src.router import map_emb_to_path
+from src.router import map_emb_to_path, get_binary_path
 
 
 class PretrainedBinaryTreeRouter(ABC):
@@ -22,9 +22,34 @@ class PretrainedBinaryTreeRouter(ABC):
 class RandomBinaryTreeRouter(PretrainedBinaryTreeRouter):
     def __init__(self, depth: int):
         self.depth = depth
+        self.sample_to_path = {}
+
+    def compute_codebook(self, dataset: Dataset):
+        """
+        Randomly assigns each datapoint in the dataset to a binary path.
+        Args:
+            dataset: expects (image, label, ...) tuples or something similar
+        """
+        n_paths = 2**(self.depth-1)
+
+        for el in dataset:
+            assert type(el) == tuple
+            image = el[0]
+            assert type(image) == torch.Tensor, f"Expected torch.Tensor, got {type(image)}"
+            image = image.numpy()
+
+            path_idx = torch.randint(0, n_paths, (1,)).item()
+
+            path = get_binary_path(self.depth, path_idx)
+
+            key = image.tobytes()
+            self.sample_to_path[key] = path
 
     def get_path(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.randint(0, 2, (self.depth,))
+        """
+        Retrieve the pre-assigned path for the given sample tensor x.
+        """
+        return self.sample_to_path[x.numpy().tobytes()]
 
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
