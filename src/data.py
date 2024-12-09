@@ -1,8 +1,9 @@
 import random
-
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
+
 
 
 class RotatedMNISTDataset(Dataset):
@@ -63,10 +64,13 @@ class FixedSizeWrapper(Dataset):
     def __init__(self, dataset: Dataset, size: int):
         self.dataset = dataset
         self.size = size
+        
+        if size > len(dataset):
+            raise ValueError(f"FixedSizeWrapper size {size} is larger than the dataset size {len(dataset)}")
+        self.samples = np.random.choice(len(self.dataset), size=self.size, replace=False)
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
-        inner_idx = random.randint(0, len(self.dataset) - 1)
-        return self.dataset[inner_idx]
+        return self.dataset[self.samples[idx]]

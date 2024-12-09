@@ -51,12 +51,30 @@ class RandomBinaryTreeRouter(PretrainedBinaryTreeRouter):
 
             key = image.tobytes()
             self.sample_to_path[key] = path
+            
+    def _get_unbached_path(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Get path for a single unbatched sample
+        """
+        key = x.cpu().numpy().tobytes()
+        
+        if key not in self.sample_to_path: # inference time 
+            # gnereate a random path
+            path_idx = torch.randint(0, 2**(self.depth-1), (1,)).item()
+            path = get_binary_path(self.depth, path_idx)
+            # print(f"Generated random path: {path}")
+            return path
+        
+        # train time, return the pre-assigned path
+        # print(f"Retrieved pre-assigned path: {self.sample_to_path[key]}")
+        return self.sample_to_path[key]
 
-    def get_path(self, x: torch.Tensor) -> torch.Tensor:
+    def get_path(self, x: torch.Tensor, **metadata_kwargs) -> torch.Tensor:
         """
         Retrieve the pre-assigned path for the given sample tensor x.
         """
-        return self.sample_to_path[x.numpy().tobytes()]
+        paths = [self._get_unbached_path(x[i]) for i in range(x.shape[0])]
+        return torch.stack(paths)
 
 
 class MNISTOracleRouter(PretrainedBinaryTreeRouter):
@@ -85,6 +103,7 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
 
     def __init__(self, depth: int):
+        super().__init__()
         self.depth = depth
         self.clusterer = None
         self.emb_to_path = []
@@ -103,17 +122,13 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         # Compute binary path for each codebook vector
         self.emb_to_path = map_emb_to_path(codebook, self.depth)
 
-    def get_path(self, x: torch.Tensor) -> torch.Tensor:
+    def get_path(self, x: torch.Tensor, **metadata_kwargs) -> torch.Tensor:
         """
-        x: (data_dim,)
+        x: (bs, data_dim)
         """
-
-        # add a batch dimension
-        x = x.unsqueeze(0)
-        labels = self.clusterer.predict(x)
-        emb_ix = labels[0].item()
-
-        return self.emb_to_path[emb_ix]
+        labels = self.clusterer.predict(x.cpu())
+        paths = [self.emb_to_path[labels[i].item()] for i in range(x.shape[0])]
+        return torch.stack(paths)
 
 
 class BinaryTreeNode:

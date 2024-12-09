@@ -2,6 +2,7 @@
 import torch
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
@@ -47,7 +48,8 @@ class KMeansImageClusterer(KMeansClusterer):
         """
         
         features = []
-        for el in dataset:
+        print(f"Computing kmeans features for {len(dataset)} images")
+        for el in tqdm(dataset):
             assert type(el) == tuple
             image = el[0]
             assert type(image) == torch.Tensor, f"Expected torch.Tensor, got {type(image)}"
@@ -57,6 +59,7 @@ class KMeansImageClusterer(KMeansClusterer):
             features.append(image.flatten())
             
         features = np.array(features)
+        print(f"Fitting kmeans model with {features.shape[0]} samples")
         self.model.fit(features)
         self._cluster_centers = self.model.cluster_centers_
         
@@ -67,7 +70,7 @@ class KMeansImageClusterer(KMeansClusterer):
         """
         features = []
         for i in range(x.shape[0]):
-            image = x[i].numpy()
+            image = x[i].cpu().numpy()
             image = self.preprocess_image(image)
             features.append(image.flatten())
             
