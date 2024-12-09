@@ -1,3 +1,5 @@
+import random
+
 import torch
 from torch.utils.data import Dataset
 from torchvision import datasets, transforms
@@ -40,10 +42,10 @@ class RotatedMNISTDataset(Dataset):
         # Apply rotation
         rotation_angle = self.rotations[rotation_idx]
         rotated_image = transforms.functional.rotate(image, rotation_angle)
-        
+
         # cast image to tensor
         rotated_image = transforms.functional.to_tensor(rotated_image)
-        
+
         if rotation_idx == 0:
             # invert the colors in the image
             max_value = rotated_image.max()
@@ -55,3 +57,16 @@ class RotatedMNISTDataset(Dataset):
             rotation_idx,  # 0 for 0°, 1 for 90°, 2 for 180°, 3 for 270°
             digit_class,
         )
+
+
+class FixedSizeWrapper(Dataset):
+    def __init__(self, dataset: Dataset, size: int):
+        self.dataset = dataset
+        self.size = size
+
+    def __len__(self):
+        return self.size
+
+    def __getitem__(self, idx):
+        inner_idx = random.randint(0, len(self.dataset) - 1)
+        return self.dataset[inner_idx]
