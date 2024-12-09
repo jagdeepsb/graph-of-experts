@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from sklearn.cluster import KMeans
-from sklearn.cluster import SpectralClustering
 
 def get_binary_path(depth, i):
     '''
