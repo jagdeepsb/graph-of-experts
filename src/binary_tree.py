@@ -9,7 +9,10 @@ from src.clustering.kmeans import KMeansImageClusterer
 from src.router import get_binary_path, map_emb_to_path
 
 
-class PretrainedBinaryTreeRouter(ABC):
+class PretrainedBinaryTreeRouter(nn.Module, ABC):
+    def __init__(self):
+        super().__init__()
+
     @abstractmethod
     def get_path(self, x: torch.Tensor, **metadata_kwargs) -> torch.Tensor:
         """
@@ -22,6 +25,7 @@ class PretrainedBinaryTreeRouter(ABC):
 
 class RandomBinaryTreeRouter(PretrainedBinaryTreeRouter):
     def __init__(self, depth: int):
+        super().__init__()
         self.depth = depth
         self.sample_to_path = {}
 
@@ -56,16 +60,23 @@ class RandomBinaryTreeRouter(PretrainedBinaryTreeRouter):
 
 
 class MNISTOracleRouter(PretrainedBinaryTreeRouter):
-    """ """
+    """
+    Oracle router which predicts a path based on the rotation label
+    """
 
-    def get_path(self, x: torch.Tensor, rotation_class: torch.Tensor):
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("mask_arr", torch.Tensor([[0, 0], [0, 1], [1, 0], [1, 1]]))
+
+    def get_path(
+        self, x: torch.Tensor, rotation_labels: torch.Tensor, **metadata_kwargs
+    ):
         """
         Args:
-        - x: (data_dim,)
-        - rotation_class: ()
+        - x: (bs, ...)
+        - rotation_labels: (bs,...)
         """
-        mask_arr = torch.Tensor([[0, 0], [0, 1], [1, 0], [1, 1]])
-        return mask_arr[rotation_class]
+        return self.mask_arr[rotation_labels]
 
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
@@ -141,19 +152,27 @@ class BinaryTreeNode:
             return layer_output
 
         # Route to children if necessary
-        path_mask = path_mask[:, self._depth]
-        left_idxs = torch.where(path_mask == 0)
+        layer_mask = path_mask[:, self._depth]
+        left_idxs = torch.where(layer_mask == 0)
+        right_idxs = torch.where(layer_mask == 1)
+
         left_inputs = layer_output[left_idxs]
-        right_idxs = torch.where(path_mask == 1)
         right_inputs = layer_output[right_idxs]
 
-        final_output = torch.empty_like(x)
+        left_output = None
+        right_output = None
 
         if len(left_idxs) > 0:
-            left_output = self.left_child(left_inputs, path_mask)
-            final_output[left_idxs] = left_output
+            left_output = self.left_child(left_inputs, path_mask[left_idxs])
         if len(right_idxs) > 0:
-            right_output = self.right_child(right_inputs, path_mask)
+            right_output = self.right_child(right_inputs, path_mask[right_idxs])
+
+        output = left_output if left_output is not None else right_output
+        output_shape = (x.shape[0],) + output.shape[1:]
+        final_output = torch.empty(output_shape).to(x)
+        if left_output is not None:
+            final_output[left_idxs] = left_output
+        if right_output is not None:
             final_output[right_idxs] = right_output
 
         return final_output
@@ -172,14 +191,14 @@ class BinaryTreeGoE(nn.Module):
         super().__init__()
         self._depth = len(modules_by_depth)
         self._root = BinaryTreeNode(modules_by_depth, 0, "", self.register_module)
-        self.router = router
+        self.register_module("router", router)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, **metadata_kwargs) -> torch.Tensor:
         """
         Args:
             x: (batch_size, input_dim)
         Returns:
             y: (batch_size, output_dim)
         """
-        path_mask = torch.vmap(self.router.get_path)(x)
+        path_mask = self.router.get_path(x, **metadata_kwargs)
         return self._root(x, path_mask)
