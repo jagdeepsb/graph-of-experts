@@ -126,8 +126,8 @@ class RotatedMNISTDataset(Dataset):
 
 class CelebADataset(Dataset):
     def __init__(
-        self, root: str = "./data", train: bool = True, download: bool = True, n=6000
-    ):
+        self, root: str = "./data", train: bool = True, download: bool = True, n=3000
+    , balance_dataset=False):
         """
         Create an extended CelebA dataset split along 3 attributes.
 
@@ -150,7 +150,7 @@ class CelebADataset(Dataset):
         )
 
         self.path_attributes = ["Black_Hair", "Male", "Eyeglasses"]
-        self.num_paths = int(len(self.path_attributes) ** 3)
+        self.num_paths = int(2**len(self.path_attributes))
         self.attr_dict = {}
         for i in range(2 ** len(self.path_attributes)):
             attr_str = ""
@@ -164,40 +164,32 @@ class CelebADataset(Dataset):
         self.class_attribute = "Smiling"
 
         # data split
-        n = n // 2
-        d1 = []
-        attr1 = np.zeros((n, len(self.path_attributes)))
-        class1 = np.zeros((n,))
-        d2 = []
-        attr2 = np.zeros((n, len(self.path_attributes)))
-        class2 = np.zeros((n,))
-        split_attr_idx = dataset.attr_names.index(self.path_attributes[0])
-        for x, y in tqdm(dataset, desc=f"Splitting data by {self.path_attributes[0]}"):
-            if y[split_attr_idx] == 1 and len(d1) < n:
-                d1.append(x)
-                for i, attr in enumerate(self.path_attributes):
-                    attr_idx = dataset.attr_names.index(attr)
-                    attr1[len(d1) - 1, i] = y[attr_idx]
-                class1[len(d1) - 1] = y[dataset.attr_names.index(self.class_attribute)]
-            elif y[split_attr_idx] == 0 and len(d2) < n:
-                d2.append(x)
-                for i, attr in enumerate(self.path_attributes):
-                    attr_idx = dataset.attr_names.index(attr)
-                    attr2[len(d2) - 1, i] = y[attr_idx]
-                class2[len(d2) - 1] = y[dataset.attr_names.index(self.class_attribute)]
+        n = n // self.num_paths
+        d = {}
+        for i in range(self.num_paths):
+            d[i] = []
+        for x, y in tqdm(dataset, desc='Splitting data'):
+            attr = 0
+            for i, path_attr in enumerate(self.path_attributes):
+                attr_idx = dataset.attr_names.index(path_attr)
+                attr += y[attr_idx].item() * 2**i
+            target = y[dataset.attr_names.index(self.class_attribute)]
+            if len(d[attr]) < n:
+                d[attr].append((x, target))
 
-            if len(d1) >= n and len(d2) >= n:
-                break
+        if balance_dataset:
+            min_len = min([len(d[attr]) for attr in d])
+            for attr in d:
+                d[attr] = d[attr][:min_len]
 
-        self.x = d1 + d2
-        self.attr = np.vstack((attr1, attr2))
-        self.target = np.hstack((class1, class2))
+        self.d = d
+        self.dataset_lengths = [len(d[attr]) for attr in d]
 
     def __len__(self):
         """
         Total number of samples
         """
-        return len(self.x)
+        return sum(self.dataset_lengths)
 
     def __getitem__(self, idx):
         """
@@ -206,11 +198,12 @@ class CelebADataset(Dataset):
         Returns:
             tuple: (image, attr (int), class (int))
         """
-        image = self.x[idx]
-        attr = 0
-        for i, attr_val in enumerate(self.attr[idx]):
-            attr += attr_val * 2**i
-        target = self.target[idx]
+        for i, length in enumerate(self.dataset_lengths):
+            if idx < length:
+                image, target = self.d[i][idx]
+                attr = i
+                break
+            idx -= length
 
         # attr to int64
         attr = np.array(attr, dtype=np.int64)
@@ -219,7 +212,7 @@ class CelebADataset(Dataset):
         target = np.array(target, dtype=np.int64)
 
         return (
-            image,
+            image, 
             attr,
             target,
         )
