@@ -3,14 +3,16 @@ import torch
 import cv2
 import numpy as np
 from tqdm import tqdm
+from torch import nn
 
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
 from sklearn.cluster import KMeans
 from src.vqvae.train import train_vae, get_vae
 
-class KMeansClusterer():
+class KMeansClusterer(nn.Module):
     def __init__(self, n_clusters, verbose=False, n_tries=10):
+        super().__init__()
         self.n_clusters = n_clusters
         self.model = KMeans(
             n_clusters=n_clusters,
@@ -139,19 +141,19 @@ class KMeansImageClusterer(KMeansClusterer):
         plt.savefig("clustered_images.png")
         
 class KMeansVQVAEClusterer(KMeansClusterer):
-    def __init__(self, n_clusters, verbose=False, n_tries=10):
+    def __init__(self, n_clusters, dataset: Dataset, verbose=False, n_tries=10):
         super().__init__(n_clusters, verbose, n_tries)
         self.vae = None
+        
+        # determine number of channels in input dim
+        input_dim = dataset[0][0].shape[0]
+        self.vae = get_vae(input_dim=input_dim)
     
     def fit(self, dataset: Dataset):
         """
         dataset: torch.utils.data.Dataset
         Expects (image, ...) tuples
         """
-        
-        # determine number of channels in input dim
-        input_dim = dataset[0][0].shape[0]
-        self.vae = get_vae(input_dim=input_dim)
         
         # train the vae
         train_vae(self.vae, dataset)
