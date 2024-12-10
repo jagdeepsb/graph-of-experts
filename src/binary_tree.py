@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, List, Type
+from typing import Callable, List, Type, Dict
 
 import torch
 import torch.nn as nn
@@ -208,12 +208,12 @@ class BinaryTreeGoE(nn.Module):
         self._root = BinaryTreeNode(modules_by_depth, 0, "", self.register_module)
         self.register_module("router", router)
 
-    def forward(self, x: torch.Tensor, **metadata_kwargs) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Args:
             x: (batch_size, input_dim)
         Returns:
             y: (batch_size, output_dim)
         """
-        path_mask = self.router.get_path(x, **metadata_kwargs)
+        path_mask = self.router.get_path(x, **router_metadata)
         return self._root(x, path_mask)

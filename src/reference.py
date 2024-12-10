@@ -1,4 +1,4 @@
-from typing import List, Type
+from typing import List, Type, Dict
 
 import torch
 import torch.nn as nn
@@ -14,9 +14,11 @@ class ReferenceModel(nn.Module):
         super().__init__()
         self.net = nn.Sequential(*[module() for module in modules_by_depth])
 
-    def forward(self, x: torch.Tensor, **metadata_kwargs):
+    def forward(self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]) -> torch.Tensor:
         """
         Args:
         - x: (batch_size, 1, 28, 28)
         """
+        # print(type(x))
+        # print(metadata_kwargs)
         return self.net(x)
