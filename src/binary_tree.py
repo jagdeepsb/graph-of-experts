@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Callable, List, Type, Dict
+from typing import Callable, Dict, List, Type
 
 import torch
 import torch.nn as nn
@@ -51,20 +51,20 @@ class RandomBinaryTreeRouter(PretrainedBinaryTreeRouter):
 
             key = image.tobytes()
             self.sample_to_path[key] = path
-            
+
     def _get_unbached_path(self, x: torch.Tensor) -> torch.Tensor:
         """
         Get path for a single unbatched sample
         """
         key = x.cpu().numpy().tobytes()
-        
-        if key not in self.sample_to_path: # inference time 
+
+        if key not in self.sample_to_path:  # inference time
             # gnereate a random path
-            path_idx = torch.randint(0, 2**(self.depth-1), (1,)).item()
+            path_idx = torch.randint(0, 2 ** (self.depth - 1), (1,)).item()
             path = get_binary_path(self.depth, path_idx)
             # print(f"Generated random path: {path}")
             return path
-        
+
         # train time, return the pre-assigned path
         # print(f"Retrieved pre-assigned path: {self.sample_to_path[key]}")
         return self.sample_to_path[key]
@@ -87,14 +87,14 @@ class MNISTOracleRouter(PretrainedBinaryTreeRouter):
         self.register_buffer("mask_arr", torch.Tensor([[0, 0], [0, 1], [1, 0], [1, 1]]))
 
     def get_path(
-        self, x: torch.Tensor, rotation_labels: torch.Tensor, **metadata_kwargs
+        self, x: torch.Tensor, oracle_metadata: torch.Tensor, **metadata_kwargs
     ):
         """
         Args:
         - x: (bs, ...)
         - rotation_labels: (bs,...)
         """
-        return self.mask_arr[rotation_labels]
+        return self.mask_arr[oracle_metadata]
 
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
@@ -208,7 +208,9 @@ class BinaryTreeGoE(nn.Module):
         self._root = BinaryTreeNode(modules_by_depth, 0, "", self.register_module)
         self.register_module("router", router)
 
-    def forward(self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]
+    ) -> torch.Tensor:
         """
         Args:
             x: (batch_size, input_dim)
