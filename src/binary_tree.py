@@ -120,19 +120,20 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     Router which uses hierarchical clustering of learned (discrete) latent variable (using e.g., a VQ-VAE) to route data
     """
 
-    def __init__(self, depth: int):
+    def __init__(self, depth: int, dataset: Dataset):
         super().__init__()
         self.depth = depth
         self.clusterer = None
         self.emb_to_path = []
+        
+        # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
+        self.clusterer = KMeansVQVAEClusterer(n_clusters=2 ** (self.depth - 1), dataset=dataset)
 
     def compute_codebook(self, dataset: Dataset):
         """
         Args:
             dataset: expects (image, ...) tuples
         """
-        # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
-        self.clusterer = KMeansVQVAEClusterer(n_clusters=2 ** (self.depth - 1))
         self.clusterer.fit(dataset)
 
         codebook = self.clusterer.cluster_centers()  # shape (n_clusters, n_features)
