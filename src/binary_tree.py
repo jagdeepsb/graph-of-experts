@@ -106,14 +106,14 @@ class CelebAOracleRouter(PretrainedBinaryTreeRouter):
         self.register_buffer("mask_arr", torch.Tensor([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]))
 
     def get_path(
-        self, x: torch.Tensor, rotation_labels: torch.Tensor, **metadata_kwargs
+        self, x: torch.Tensor, comb_attr_labels: torch.Tensor, **metadata_kwargs
     ):
         """
         Args:
         - x: (bs, ...)
-        - rotation_labels: (bs,...)
+        - comb_attr_labels: (bs,...)
         """
-        return self.mask_arr[rotation_labels]
+        return self.mask_arr[comb_attr_labels]
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
