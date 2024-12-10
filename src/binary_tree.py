@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
-from src.clustering.kmeans import KMeansImageClusterer
+from src.clustering.kmeans import KMeansImageClusterer, KMeansVQVAEClusterer
 from src.router import get_binary_path, map_emb_to_path
 
 
@@ -96,6 +96,24 @@ class MNISTOracleRouter(PretrainedBinaryTreeRouter):
         """
         return self.mask_arr[oracle_metadata]
 
+class CelebAOracleRouter(PretrainedBinaryTreeRouter):
+    """
+    Oracle router which predicts a path based on the rotation label
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.register_buffer("mask_arr", torch.Tensor([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]))
+
+    def get_path(
+        self, x: torch.Tensor, rotation_labels: torch.Tensor, **metadata_kwargs
+    ):
+        """
+        Args:
+        - x: (bs, ...)
+        - rotation_labels: (bs,...)
+        """
+        return self.mask_arr[rotation_labels]
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
@@ -113,7 +131,8 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         Args:
             dataset: expects (image, ...) tuples
         """
-        self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
+        # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
+        self.clusterer = KMeansVQVAEClusterer(n_clusters=2 ** (self.depth - 1))
         self.clusterer.fit(dataset)
 
         codebook = self.clusterer.cluster_centers()  # shape (n_clusters, n_features)
