@@ -171,7 +171,7 @@ class KMeansVQVAEClusterer(KMeansClusterer):
 
         features = np.concatenate(features, axis=0)
         
-        print(f"Fitting kmeans model with {features.shape[0]} samples")
+        print(f"Fitting kmeans model with {features.shape[0]} samples matrix size {features.shape}")
         self.model.fit(features)
         self._cluster_centers = self.model.cluster_centers_
         

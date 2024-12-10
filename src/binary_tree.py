@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
-from src.clustering.kmeans import KMeansImageClusterer
+from src.clustering.kmeans import KMeansImageClusterer, KMeansVQVAEClusterer
 from src.router import get_binary_path, map_emb_to_path
 
 
@@ -113,7 +113,8 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         Args:
             dataset: expects (image, ...) tuples
         """
-        self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
+        # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
+        self.clusterer = KMeansVQVAEClusterer(n_clusters=2 ** (self.depth - 1))
         self.clusterer.fit(dataset)
 
         codebook = self.clusterer.cluster_centers()  # shape (n_clusters, n_features)
