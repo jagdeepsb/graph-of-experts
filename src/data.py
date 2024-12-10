@@ -211,10 +211,10 @@ class CelebADataset(Dataset):
         for i, attr_val in enumerate(self.attr[idx]):
             attr += attr_val * 2**i
         target = self.target[idx]
-        
+
         # attr to int64
         attr = np.array(attr, dtype=np.int64)
-        
+
         # target to int64
         target = np.array(target, dtype=np.int64)
 
