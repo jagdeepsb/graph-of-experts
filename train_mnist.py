@@ -1,4 +1,5 @@
 import functools
+import multiprocessing
 from dataclasses import dataclass
 from itertools import product
 from multiprocessing import Pool
@@ -277,8 +278,8 @@ def main():
     # Hyperparameters
     param_factors = [2, 4, 8, 24]
     model_names = ["ref_sqA", "ref_sqB", "goe_oracle", "goe_random", "goe_latent"]
-    num_epochs = 1
-    num_runs = 2
+    num_epochs = 100
+    num_runs = 5
 
     jobs: List[TrainConfig] = []
     num_devices = torch.cuda.device_count()
@@ -299,6 +300,7 @@ def main():
 
     compiled_results = {}
 
+    multiprocessing.set_start_method("spawn")
     with Pool(len(jobs)) as pool:
         for job_result in pool.map(train_model, jobs):
             if job_result.model_name not in compiled_results:

@@ -123,9 +123,6 @@ class RotatedMNISTDataset(Dataset):
             test_loader,
         )
 
-    def __getitem__(self, idx):
-        return self.dataset[self.samples[idx]]
-
 
 class CelebADataset(Dataset):
     def __init__(
