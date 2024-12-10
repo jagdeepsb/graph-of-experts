@@ -44,7 +44,8 @@ class VQVAE(nn.Module):
         return embedding_loss, x_hat, perplexity
     
     def get_embedding(self, x):
-        z_e = self.encoder(x)
-        z_e = self.pre_quantization_conv(z_e)
-        _, z_q, _, _, _ = self.vector_quantization(z_e)
-        return z_q
+        with torch.no_grad():
+            z_e = self.encoder(x)
+            z_e = self.pre_quantization_conv(z_e)
+            _, z_q, _, _, _ = self.vector_quantization(z_e)
+            return z_q.detach()

@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 from torch import nn
+from torchsummary import summary
 
 from matplotlib import pyplot as plt
 from torch.utils.data import Dataset
@@ -148,6 +149,11 @@ class KMeansVQVAEClusterer(KMeansClusterer):
         # determine number of channels in input dim
         input_dim = dataset[0][0].shape[0]
         self.vae = get_vae(input_dim=input_dim)
+        
+        # print summary
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.vae.to(device)
+        summary(self.vae, (input_dim, 32, 32))
     
     def fit(self, dataset: Dataset):
         """
