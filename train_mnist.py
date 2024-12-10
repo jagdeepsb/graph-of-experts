@@ -1,5 +1,8 @@
+import argparse
 import functools
 import multiprocessing
+import os
+import random
 from dataclasses import dataclass
 from itertools import product
 from multiprocessing import Pool
@@ -148,7 +151,7 @@ class TrainConfig:
     experiment_name: str
     model_name: str
     param_factor: int
-    num_runs: int
+    run_num: int
     num_epochs: int
     device: torch.device
 
@@ -158,9 +161,9 @@ class TrainResult:
     experiment_name: str
     model_name: str
     param_factor: int
-    mean_accuracy: float
-    std_accuracy: float
-    flops: List[float]
+    run_num: int
+    accuracy: float
+    flops: int
     num_params: int
 
 
@@ -188,7 +191,7 @@ def train_model(cfg: TrainConfig):
     model_name = cfg.model_name
     param_factor = cfg.param_factor
     num_epochs = cfg.num_epochs
-    num_runs = cfg.num_runs
+    run_num = cfg.run_num
     device = cfg.device
 
     # Build dataloaders and datasets
@@ -204,32 +207,32 @@ def train_model(cfg: TrainConfig):
     modules_by_depth = build_modules(param_factor)
     modules_by_depth_sqA = build_modules_sqA(param_factor)
 
-    models = []
-    for run in range(num_runs):
-        run_id = f"{experiment_name}_{model_name}_{param_factor}_{run}"
-        print(f"Training {run_id} on {device}...")
-        if model_name == "ref_sqA":
-            model = ReferenceModel(modules_by_depth=modules_by_depth_sqA).to(device)
-        elif model_name == "ref_sqB":
-            model = ReferenceModel(modules_by_depth=modules_by_depth).to(device)
-        elif model_name == "goe_oracle":
-            oracle_router = get_oracle_router()
-            model = BinaryTreeGoE(
-                modules_by_depth=modules_by_depth, router=oracle_router
-            ).to(device)
-        elif model_name == "goe_random":
-            random_router = get_random_router(train_dataset)
-            model = BinaryTreeGoE(
-                modules_by_depth=modules_by_depth, router=random_router
-            ).to(device)
-        elif model_name == "goe_latent":
-            latent_router = get_latent_router(train_dataset)
-            model = BinaryTreeGoE(
-                modules_by_depth=modules_by_depth, router=latent_router
-            ).to(device)
-        else:
-            raise ValueError(f"Unknown model name: {model_name}")
+    run_id = f"{experiment_name}_{model_name}_{param_factor}_{run_num}"
+    save_path = f"checkpoints/rotated-mnist2/{run_id}.pt"
 
+    if model_name == "ref_sqA":
+        model = ReferenceModel(modules_by_depth=modules_by_depth_sqA).to(device)
+    elif model_name == "ref_sqB":
+        model = ReferenceModel(modules_by_depth=modules_by_depth).to(device)
+    elif model_name == "goe_oracle":
+        oracle_router = get_oracle_router()
+        model = BinaryTreeGoE(
+            modules_by_depth=modules_by_depth, router=oracle_router
+        ).to(device)
+    elif model_name == "goe_random":
+        random_router = get_random_router(train_dataset)
+        model = BinaryTreeGoE(
+            modules_by_depth=modules_by_depth, router=random_router
+        ).to(device)
+    elif model_name == "goe_latent":
+        latent_router = get_latent_router(train_dataset)
+        model = BinaryTreeGoE(
+            modules_by_depth=modules_by_depth, router=latent_router
+        ).to(device)
+    else:
+        raise ValueError(f"Unknown model name: {model_name}")
+
+    if not os.path.exists(save_path):
         print(f"Training {run_id}...")
 
         _ = training_loop(
@@ -242,16 +245,13 @@ def train_model(cfg: TrainConfig):
             lr=0.005,
             epochs_per_accuracy=5,
         )
-        save_path = f"checkpoints/rotated-mnist/{run_id}.pt"
         save_model(model, save_path)
-        models.append(model)
+    else:
+        print(f"Loading {run_id} from {save_path}")
+        model.load_state_dict(torch.load(save_path))
 
     # Compute accuracies
-    accuracies = torch.Tensor(
-        [get_accuracy(model, test_loader, device) for model in models]
-    )
-    mean_accuracy = accuracies.mean().item()
-    std_accuracy = accuracies.std().item()
+    accuracy = get_accuracy(model, test_loader, device)
 
     # Compute flops
     image, rotation_label, digit_label = train_dataset[0]
@@ -260,26 +260,36 @@ def train_model(cfg: TrainConfig):
     router_metadata = {
         "oracle_metadata": rotation_label,
     }
-    num_params = get_num_parameters(models[0])
-    flops = get_model_flops(models[0], (image, router_metadata))
+    num_params = get_num_parameters(model)
+    try:
+        flops = get_model_flops(model, (image, router_metadata))
+    except RuntimeError:
+        flops = 0
 
     return TrainResult(
         experiment_name=experiment_name,
         model_name=model_name,
         param_factor=param_factor,
-        mean_accuracy=mean_accuracy,
-        std_accuracy=std_accuracy,
+        run_num=run_num,
+        accuracy=accuracy,
         num_params=num_params,
         flops=flops,
     )
 
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--experiment_name", type=str, default="rotated_mnist")
+
+
 def main():
     # Hyperparameters
     param_factors = [2, 4, 8, 24]
-    model_names = ["ref_sqA", "ref_sqB", "goe_oracle", "goe_random", "goe_latent"]
+    model_names = ["ref_sqB", "goe_oracle", "goe_latent"]
     num_epochs = 100
     num_runs = 5
+    # experiment_name = f"rotated_mnist{random.randint(0, 1000)}"
+    args = parser.parse_args()
+    experiment_name = args.experiment_name
 
     jobs: List[TrainConfig] = []
     num_devices = torch.cuda.device_count()
@@ -287,27 +297,28 @@ def main():
         product(param_factors, model_names)
     ):
         device = torch.device(f"cuda:{job_idx % num_devices}")
-        jobs.append(
-            TrainConfig(
-                experiment_name="rotated_mnist",
-                model_name=model_name,
-                param_factor=param_factor,
-                num_epochs=num_epochs,
-                num_runs=num_runs,
-                device=device,
+        for run in range(num_runs):
+            jobs.append(
+                TrainConfig(
+                    experiment_name=experiment_name,
+                    model_name=model_name,
+                    param_factor=param_factor,
+                    num_epochs=num_epochs,
+                    run_num=run,
+                    device=device,
+                )
             )
-        )
 
     compiled_results = {}
 
-    multiprocessing.set_start_method("spawn")
     with Pool(len(jobs)) as pool:
         for job_result in pool.map(train_model, jobs):
             if job_result.model_name not in compiled_results:
                 compiled_results[job_result.model_name] = {}
-            compiled_results[job_result.model_name][job_result.param_factor] = {
-                "mean_accuracy": job_result.mean_accuracy,
-                "std_accuracy": job_result.std_accuracy,
+            compiled_results[job_result.model_name][job_result.param_factor][
+                job_result.run_num
+            ] = {
+                "accuracy": job_result.accuracy,
                 "num_params": job_result.num_params,
                 "flops": job_result.flops,
             }
@@ -323,8 +334,9 @@ def main():
         "results": compiled_results,
         "metadata": metadata,
     }
-    torch.save(results, "results/rotated_mnist_results.pt")
+    torch.save(results, f"results/{experiment_name}_results.pt")
 
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method("spawn")
     main()
