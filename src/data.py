@@ -78,16 +78,21 @@ class FixedSizeWrapper(Dataset):
 class CelebADataset(Dataset):
     def __init__(self, root: str = "./data", train: bool = True, download: bool = True, n=6000):
         """
-        Create an extended CelebA dataset with rotated variations.
+        Create an extended CelebA dataset split along 3 attributes.
 
         Args:
             root (str): Root directory of dataset
             train (bool): If True, creates dataset from training set, else test set
             download (bool): If True, downloads the dataset if not already present
-            transform (callable, optional): Optional transform to be applied on an image
         """
         split = 'train' if train else 'test'
-        dataset = datasets.CelebA(root=root, split=split, download=download)
+
+        transform = transforms.Compose([
+            transforms.Resize((64, 64)),
+            transforms.ToTensor(),
+        ])
+
+        dataset = datasets.CelebA(root=root, split=split, download=download, transform=transform)
         
         self.path_attributes = ['Black_Hair', 'Male', 'Eyeglasses']
         self.num_paths = int(len(self.path_attributes)**3)
