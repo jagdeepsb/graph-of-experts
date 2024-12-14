@@ -141,7 +141,10 @@ def main(experiment_name: str, num_runs: int):
     for job_idx, (param_factor, model_name) in enumerate(
         product(param_factors, model_names)
     ):
-        device = torch.device(f"cuda:{job_idx % num_devices}")
+        if (num_devices):
+            device = torch.device(f"cuda:{job_idx % num_devices}")
+        else:
+            device = torch.device("cpu")
         for run_num in range(num_runs):
         
             modules_by_depth = build_modules(param_factor)
@@ -179,7 +182,7 @@ def main(experiment_name: str, num_runs: int):
                 raise ValueError(f"Model {run_id} not found at {save_path}")
             
             print(f"Loading {run_id} from {save_path}")
-            model.load_state_dict(torch.load(save_path))
+            model.load_state_dict(torch.load(save_path, map_location=device))
             
             # Compute accuracies
             test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)

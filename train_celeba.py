@@ -220,7 +220,7 @@ def train_model(cfg: TrainConfig):
         save_model(model, save_path)
     else:
         print(f"Loading {run_id} from {save_path}")
-        model.load_state_dict(torch.load(save_path))
+        model.load_state_dict(torch.load(save_path, map_location=device))
 
     # Compute accuracies
     accuracy = get_accuracy(model, test_loader, device)
@@ -261,7 +261,10 @@ def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str)
     for job_idx, (param_factor, model_name) in enumerate(
         product(param_factors, model_names)
     ):
-        device = torch.device(f"cuda:{job_idx % num_devices}")
+        if (num_devices):
+            device = torch.device(f"cuda:{job_idx % num_devices}")
+        else:
+            device = torch.device(f"cpu")
         for run in range(num_runs):
             jobs.append(
                 TrainConfig(

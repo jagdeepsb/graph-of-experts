@@ -22,64 +22,8 @@ from src.metrics import get_model_flops, get_num_parameters
 from src.reference import ReferenceModel
 from src.train import get_accuracy, save_model, training_loop
 
-
-def build_modules_sqA(
-    param_factor: int,
-) -> Tuple[Type[nn.Module], Type[nn.Module], Type[nn.Module]]:
-    """
-    Architecture factory for Status Quo A Model for RotatedMNIST task which has the same number of *total* parameters as the Graph of Experts. Takes in hyperparameter param_factor, outputs list of module architectures which scale linearly in param_factor
-    """
-
-    class LayerOne(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv = nn.Conv2d(1, param_factor, kernel_size=3, padding=1)
-
-        def forward(self, x: torch.Tensor):
-            """
-            Args:
-            - x: (batch_size, 1, 28, 28)
-            """
-            return F.relu(
-                F.max_pool2d(self.conv(x), 2)
-            )  # (batch_size, param_factor, 14, 14)
-
-    class LayerTwo(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv = nn.Conv2d(
-                param_factor, 2 * 2 * param_factor, kernel_size=3, padding=1
-            )
-
-        def forward(self, x: torch.Tensor):
-            """
-            Args:
-            - x: (batch_size, 32, 14, 14)
-            """
-            return F.relu(
-                F.max_pool2d(self.conv(x), 2)
-            )  # (batch_size, 2 * 2 * param_factor, 7, 7)
-
-    class LayerThree(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.fc1 = nn.Linear(2 * 2 * param_factor * 7 * 7, 2 * 4 * param_factor)
-            self.fc2 = nn.Linear(2 * 4 * param_factor, 10)
-
-        def forward(self, x: torch.Tensor):
-            """
-            Args:
-            - x: (batch_size, 128, 7, 7)
-            """
-            x = x.view(
-                -1, 2 * 2 * param_factor * 7 * 7
-            )  # (batch_size, 2 * 2 * param_factor * 7 * 7)
-            x = F.relu(self.fc1(x))  # (batch_size, 2 * 4 * param_factor)
-            logits = self.fc2(x)  # (batch_size, 10)
-            return logits
-
-    return LayerOne, LayerTwo, LayerThree
-
+CHECKPOINTS_DIR = "checkpoints/rotated_mnist"
+RESULTS_DIR = "results/rotated_mnist"
 
 def build_modules(
     param_factor: int,
@@ -198,16 +142,14 @@ def train_model(cfg: TrainConfig):
     ) = RotatedMNISTDataset.get_rotated_mnist_loaders()
 
     modules_by_depth = build_modules(param_factor)
-    modules_by_depth_sqA = build_modules_sqA(param_factor)
 
     run_id = f"{model_name}_{param_factor}_{run_num}"
-    if not os.path.exists(f"checkpoints/rotated_mnist/{experiment_name}"):
-        os.makedirs(f"checkpoints/rotated_mnist/{experiment_name}", exist_ok=True)
-    save_path = f"checkpoints/rotated_mnist/{experiment_name}/{run_id}.pt"
+    experiment_dir = os.path.join(CHECKPOINTS_DIR, experiment_name)
+    if not os.path.exists(experiment_dir):
+        os.makedirs(experiment_dir, exist_ok=True)
+    save_path = os.path.join(experiment_dir, f"{run_id}.pt")
 
-    if model_name == "ref_sqA":
-        model = ReferenceModel(modules_by_depth=modules_by_depth_sqA).to(device)
-    elif model_name == "ref_sqB":
+    if model_name == "ref_sqB":
         model = ReferenceModel(modules_by_depth=modules_by_depth).to(device)
     elif model_name == "goe_oracle":
         oracle_router = get_oracle_router()
@@ -243,7 +185,7 @@ def train_model(cfg: TrainConfig):
         save_model(model, save_path)
     else:
         print(f"Loading {run_id} from {save_path}")
-        model.load_state_dict(torch.load(save_path))
+        model.load_state_dict(torch.load(save_path, map_location=device))
 
     # Compute accuracies
     accuracy = get_accuracy(model, test_loader, device)
@@ -283,7 +225,10 @@ def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str)
     for job_idx, (param_factor, model_name) in enumerate(
         product(param_factors, model_names)
     ):
-        device = torch.device(f"cuda:{job_idx % num_devices}")
+        if (num_devices):
+            device = torch.device(f"cuda:{job_idx % num_devices}")
+        else:
+            device = torch.device(f"cpu")
         for run in range(num_runs):
             jobs.append(
                 TrainConfig(
@@ -324,7 +269,9 @@ def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str)
         "results": compiled_results,
         "metadata": metadata,
     }
-    torch.save(results, f"results/{experiment_name}_results.pt")
+    if not os.path.exists(RESULTS_DIR):
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+    torch.save(results, f"{RESULTS_DIR}/{experiment_name}_results.pt")
 
 
 if __name__ == "__main__":
