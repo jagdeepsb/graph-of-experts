@@ -1,10 +1,7 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class VectorQuantizer(nn.Module):
@@ -28,7 +25,7 @@ class VectorQuantizer(nn.Module):
 
     def forward(self, z):
         """
-        Inputs the output of the encoder network z and maps it to a discrete 
+        Inputs the output of the encoder network z and maps it to a discrete
         one-hot vector that is the index of the closest embedding vector e_j
 
         z (continuous) -> z_q (discrete)
@@ -46,22 +43,24 @@ class VectorQuantizer(nn.Module):
         z_flattened = z.view(-1, self.e_dim)
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
 
-        d = torch.sum(z_flattened ** 2, dim=1, keepdim=True) + \
-            torch.sum(self.embedding.weight**2, dim=1) - 2 * \
-            torch.matmul(z_flattened, self.embedding.weight.t())
+        d = (
+            torch.sum(z_flattened**2, dim=1, keepdim=True)
+            + torch.sum(self.embedding.weight**2, dim=1)
+            - 2 * torch.matmul(z_flattened, self.embedding.weight.t())
+        )
 
         # find closest encodings
         min_encoding_indices = torch.argmin(d, dim=1).unsqueeze(1)
-        min_encodings = torch.zeros(
-            min_encoding_indices.shape[0], self.n_e).to(device)
+        min_encodings = torch.zeros(min_encoding_indices.shape[0], self.n_e).to(z)
         min_encodings.scatter_(1, min_encoding_indices, 1)
 
         # get quantized latent vectors
         z_q = torch.matmul(min_encodings, self.embedding.weight).view(z.shape)
 
         # compute loss for embedding
-        loss = torch.mean((z_q.detach()-z)**2) + self.beta * \
-            torch.mean((z_q - z.detach()) ** 2)
+        loss = torch.mean((z_q.detach() - z) ** 2) + self.beta * torch.mean(
+            (z_q - z.detach()) ** 2
+        )
 
         # preserve gradients
         z_q = z + (z_q - z).detach()

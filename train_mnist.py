@@ -2,7 +2,6 @@ import argparse
 import functools
 import multiprocessing
 import os
-import random
 from dataclasses import dataclass
 from itertools import product
 from multiprocessing import Pool
@@ -21,13 +20,7 @@ from src.binary_tree import (
 from src.data import RotatedMNISTDataset
 from src.metrics import get_model_flops, get_num_parameters
 from src.reference import ReferenceModel
-from src.train import (
-    do_train_epoch,
-    do_val_epoch,
-    get_accuracy,
-    save_model,
-    training_loop,
-)
+from src.train import get_accuracy, save_model, training_loop
 
 
 def build_modules_sqA(
@@ -180,7 +173,7 @@ def get_random_router(train_dataset):
 
 @functools.lru_cache(maxsize=None)
 def get_latent_router(train_dataset):
-    latent_router = LatentVariableRouter(depth=3)
+    latent_router = LatentVariableRouter(depth=3, dataset=train_dataset)
     latent_router.compute_codebook(train_dataset)
     return latent_router
 
@@ -207,8 +200,10 @@ def train_model(cfg: TrainConfig):
     modules_by_depth = build_modules(param_factor)
     modules_by_depth_sqA = build_modules_sqA(param_factor)
 
-    run_id = f"{experiment_name}_{model_name}_{param_factor}_{run_num}"
-    save_path = f"checkpoints/rotated-mnist2/{run_id}.pt"
+    run_id = f"{model_name}_{param_factor}_{run_num}"
+    if not os.path.exists(f"checkpoints/rotated_mnist/{experiment_name}"):
+        os.makedirs(f"checkpoints/rotated_mnist/{experiment_name}", exist_ok=True)
+    save_path = f"checkpoints/rotated_mnist/{experiment_name}/{run_id}.pt"
 
     if model_name == "ref_sqA":
         model = ReferenceModel(modules_by_depth=modules_by_depth_sqA).to(device)
@@ -277,19 +272,11 @@ def train_model(cfg: TrainConfig):
     )
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--experiment_name", type=str, default="rotated_mnist")
-
-
-def main():
+def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str):
     # Hyperparameters
     param_factors = [2, 4, 8, 24]
-    model_names = ["ref_sqB", "goe_oracle", "goe_latent"]
-    num_epochs = 100
-    num_runs = 5
-    # experiment_name = f"rotated_mnist{random.randint(0, 1000)}"
-    args = parser.parse_args()
-    experiment_name = args.experiment_name
+    # model_names = ["ref_sqB", "goe_oracle", "goe_latent"]
+    model_names = ["goe_latent"]
 
     jobs: List[TrainConfig] = []
     num_devices = torch.cuda.device_count()
@@ -311,10 +298,13 @@ def main():
 
     compiled_results = {}
 
-    with Pool(len(jobs)) as pool:
+    print(f"Running {len(jobs)} jobs on {num_workers} workers...")
+    with Pool(num_workers) as pool:
         for job_result in pool.map(train_model, jobs):
             if job_result.model_name not in compiled_results:
                 compiled_results[job_result.model_name] = {}
+            if job_result.param_factor not in compiled_results[job_result.model_name]:
+                compiled_results[job_result.model_name][job_result.param_factor] = {}
             compiled_results[job_result.model_name][job_result.param_factor][
                 job_result.run_num
             ] = {
@@ -338,5 +328,16 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--experiment_name", type=str, default="rotated_mnist_test")
+    parser.add_argument("--num_workers", type=int, default=10)
+    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--num_runs", type=int, default=5)
+    args = parser.parse_args()
     multiprocessing.set_start_method("spawn")
-    main()
+    main(
+        num_workers=args.num_workers,
+        num_epochs=args.num_epochs,
+        num_runs=args.num_runs,
+        experiment_name=args.experiment_name,
+    )

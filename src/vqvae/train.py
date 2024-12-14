@@ -1,68 +1,35 @@
-import argparse
+import os
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset
 
 from src.vqvae.vqvae import VQVAE
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-
-    # parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--batch_size", type=int, default=128)
-    # parser.add_argument("--n_updates", type=int, default=5000)
-    parser.add_argument("--n_updates", type=int, default=1000)
-    parser.add_argument("--n_hiddens", type=int, default=32)
-    parser.add_argument("--n_residual_hiddens", type=int, default=32)
-    parser.add_argument("--n_residual_layers", type=int, default=2)
-    # parser.add_argument("--embedding_dim", type=int, default=64)
-    # parser.add_argument("--n_embeddings", type=int, default=512)
-    parser.add_argument("--embedding_dim", type=int, default=4)
-    parser.add_argument("--n_embeddings", type=int, default=128)
-    parser.add_argument("--beta", type=float, default=0.25)
-    parser.add_argument("--learning_rate", type=float, default=3e-4)
-    parser.add_argument("--log_interval", type=int, default=50)
-    parser.add_argument("--dataset", type=str, default="CIFAR10")
-
-    # whether or not to save model
-    parser.add_argument("-save", action="store_true")
-    parser.add_argument("--filename", type=str, default="vae_weights")
-
-    args = parser.parse_args()
-    return args
-
-
 def get_vae(input_dim: int):
-    args = get_args()
     model = VQVAE(
         input_dim,
-        args.n_hiddens,
-        args.n_residual_hiddens,
-        args.n_residual_layers,
-        args.n_embeddings,
-        args.embedding_dim,
-        args.beta,
     )
     return model
 
 
-def train_vae(model: VQVAE, dataset: Dataset):
-    args = get_args()
+def train_vae(
+    model: VQVAE,
+    dataset: Dataset,
+    log_interval: int = 50,
+    lr: float = 3e-4,
+    n_updates: int = 1000,
+    batch_size: int = 128,
+):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    if args.save:
-        print("Results will be saved in ./results/vqvae_" + args.filename + ".pth")
-
     train_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=args.batch_size, shuffle=True
+        dataset, batch_size=batch_size, shuffle=True
     )
     model.to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, amsgrad=True)
+    optimizer = optim.Adam(model.parameters(), lr=lr, amsgrad=True)
     model.train()
 
     results = {
@@ -72,7 +39,7 @@ def train_vae(model: VQVAE, dataset: Dataset):
         "perplexities": [],
     }
 
-    for i in range(args.n_updates):
+    for i in range(n_updates):
         el = next(iter(train_loader))
         x = el[0]
         x = x.to(device)
@@ -90,7 +57,7 @@ def train_vae(model: VQVAE, dataset: Dataset):
         results["loss_vals"].append(loss.cpu().detach().numpy())
         results["n_updates"] = i
 
-        if i % args.log_interval == 0:
+        if i % log_interval == 0:
             """
             save model and print values
             """
@@ -103,11 +70,14 @@ def train_vae(model: VQVAE, dataset: Dataset):
                 "Update #",
                 i,
                 "Recon Error:",
-                np.mean(results["recon_errors"][-args.log_interval :]),
+                np.mean(results["recon_errors"][-log_interval:]),
                 "Loss",
-                np.mean(results["loss_vals"][-args.log_interval :]),
+                np.mean(results["loss_vals"][-log_interval:]),
                 "Perplexity:",
-                np.mean(results["perplexities"][-args.log_interval :]),
+                np.mean(results["perplexities"][-log_interval:]),
             )
-
+    save_path = model.get_save_path()
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    torch.save(model.state_dict(), save_path)
     return model

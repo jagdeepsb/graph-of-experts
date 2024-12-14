@@ -96,6 +96,7 @@ class MNISTOracleRouter(PretrainedBinaryTreeRouter):
         """
         return self.mask_arr[oracle_metadata]
 
+
 class CelebAOracleRouter(PretrainedBinaryTreeRouter):
     """
     Oracle router which predicts a path based on the rotation label
@@ -103,7 +104,21 @@ class CelebAOracleRouter(PretrainedBinaryTreeRouter):
 
     def __init__(self):
         super().__init__()
-        self.register_buffer("mask_arr", torch.Tensor([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]]))
+        self.register_buffer(
+            "mask_arr",
+            torch.Tensor(
+                [
+                    [0, 0, 0],
+                    [0, 0, 1],
+                    [0, 1, 0],
+                    [0, 1, 1],
+                    [1, 0, 0],
+                    [1, 0, 1],
+                    [1, 1, 0],
+                    [1, 1, 1],
+                ]
+            ),
+        )
 
     def get_path(
         self, x: torch.Tensor, comb_attr_labels: torch.Tensor, **metadata_kwargs
@@ -115,6 +130,7 @@ class CelebAOracleRouter(PretrainedBinaryTreeRouter):
         """
         return self.mask_arr[comb_attr_labels]
 
+
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
     """
     Router which uses hierarchical clustering of learned (discrete) latent variable (using e.g., a VQ-VAE) to route data
@@ -123,11 +139,12 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     def __init__(self, depth: int, dataset: Dataset):
         super().__init__()
         self.depth = depth
-        self.clusterer = None
         self.emb_to_path = []
-        
+
         # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
-        self.clusterer = KMeansVQVAEClusterer(n_clusters=2 ** (self.depth - 1), dataset=dataset)
+        self.clusterer = KMeansVQVAEClusterer(
+            n_clusters=2 ** (self.depth - 1), dataset=dataset
+        )
 
     def compute_codebook(self, dataset: Dataset):
         """
@@ -146,9 +163,10 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         """
         x: (bs, data_dim)
         """
-        labels = self.clusterer.predict(x.cpu())
+        device = x.device
+        labels = self.clusterer.predict(x)
         paths = [self.emb_to_path[labels[i].item()] for i in range(x.shape[0])]
-        return torch.stack(paths)
+        return torch.stack(paths).to(device)
 
 
 class BinaryTreeNode:
