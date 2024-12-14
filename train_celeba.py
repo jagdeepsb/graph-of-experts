@@ -10,6 +10,7 @@ from typing import List, Tuple, Type
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 
 from src.binary_tree import (
     BinaryTreeGoE,
@@ -21,6 +22,9 @@ from src.data import CelebADataset
 from src.metrics import get_model_flops, get_num_parameters
 from src.reference import ReferenceModel
 from src.train import get_accuracy, save_model, training_loop
+
+import warnings
+warnings.filterwarnings("ignore")
 
 CHECKPOINTS_DIR = "checkpoints/celeba"
 RESULTS_DIR = "results/celeba"
@@ -127,7 +131,7 @@ def get_oracle_router():
 
 @functools.lru_cache(maxsize=None)
 def get_random_router(train_dataset):
-    random_router = RandomBinaryTreeRouter(depth=3)
+    random_router = RandomBinaryTreeRouter(depth=4)
     random_router.compute_codebook(train_dataset)
     return random_router
 
@@ -135,7 +139,7 @@ def get_random_router(train_dataset):
 @functools.lru_cache(maxsize=None)
 def get_latent_router(train_dataset):
     latent_router = LatentVariableRouter(
-        depth=3, dataset=train_dataset, experiment_type="celeba"
+        depth=4, dataset=train_dataset, experiment_type="celeba"
     )
     latent_router.compute_codebook(train_dataset)
     return latent_router
@@ -155,9 +159,9 @@ def train_model(cfg: TrainConfig):
         train_dataset,
         val_dataset,
         test_dataset,
-        train_loader,
-        val_loader,
-        test_loader,
+        # train_loader,
+        # val_loader,
+        # test_loader,
     ) = CelebADataset.get_celeba_loaders()
 
     modules_by_depth = build_modules(param_factor)
@@ -169,6 +173,7 @@ def train_model(cfg: TrainConfig):
     save_path = os.path.join(experiment_dir, f"{run_id}.pt")
 
     if model_name == "ref_sqA":
+        raise NotImplementedError("ref_sqA not implemented for CelebA")
         model = ReferenceModel(modules_by_depth=modules_by_depth_sqA).to(device)
     elif model_name == "ref_sqB":
         model = ReferenceModel(modules_by_depth=modules_by_depth).to(device)
@@ -189,6 +194,15 @@ def train_model(cfg: TrainConfig):
         ).to(device)
     else:
         raise ValueError(f"Unknown model name: {model_name}")
+    
+    if "goe" in model_name:
+        train_loader = DataLoader(train_dataset, batch_size=32*8, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=32*8, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32, shuffle=True)
 
     if not os.path.exists(save_path):
         print(f"Training {run_id}...")
@@ -237,9 +251,10 @@ def train_model(cfg: TrainConfig):
 
 def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str):
     # Hyperparameters
-    # param_factors = [2, 4, 8, 24]
-    param_factors = [2]
+    param_factors = [1, 2, 4, 8, 12, 16]
+    # param_factors = [8]
     model_names = ["ref_sqB", "goe_oracle", "goe_latent"]
+    # model_names = ["goe_latent"]
 
     jobs: List[TrainConfig] = []
     num_devices = torch.cuda.device_count()
@@ -287,6 +302,8 @@ def main(num_workers: int, num_epochs: int, num_runs: int, experiment_name: str)
         "results": compiled_results,
         "metadata": metadata,
     }
+    if not os.path.exists(RESULTS_DIR):
+        os.makedirs(RESULTS_DIR, exist_ok=True)
     torch.save(results, f"{RESULTS_DIR}/{experiment_name}_results.pt")
 
 
