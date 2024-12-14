@@ -87,14 +87,14 @@ class MNISTOracleRouter(PretrainedBinaryTreeRouter):
         self.register_buffer("mask_arr", torch.Tensor([[0, 0], [0, 1], [1, 0], [1, 1]]))
 
     def get_path(
-        self, x: torch.Tensor, oracle_metadata: torch.Tensor, **metadata_kwargs
+        self, x: torch.Tensor, rotation_labels: torch.Tensor, **metadata_kwargs
     ):
         """
         Args:
         - x: (bs, ...)
         - rotation_labels: (bs,...)
         """
-        return self.mask_arr[oracle_metadata]
+        return self.mask_arr[rotation_labels]
 
 class CelebAOracleRouter(PretrainedBinaryTreeRouter):
     """
@@ -149,7 +149,7 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
         labels = self.clusterer.predict(x.cpu())
         paths = [self.emb_to_path[labels[i].item()] for i in range(x.shape[0])]
         return torch.stack(paths)
-
+    
 
 class BinaryTreeNode:
     def __init__(
@@ -229,7 +229,8 @@ class BinaryTreeGoE(nn.Module):
         self.register_module("router", router)
 
     def forward(
-        self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]
+        self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor],
+        take_random_path: bool = False
     ) -> torch.Tensor:
         """
         Args:
@@ -238,4 +239,7 @@ class BinaryTreeGoE(nn.Module):
             y: (batch_size, output_dim)
         """
         path_mask = self.router.get_path(x, **router_metadata)
+        if take_random_path:
+            path_mask = None
+            path_mask = torch.randint(0, 2, (x.shape[0], self._depth-1)).to(x.device)
         return self._root(x, path_mask)
