@@ -56,7 +56,7 @@ We tested out the accuracy of 5 different models on 2 tasks.
 
 # Results
 Rotated MNIST Experiment Results:
-![Rotated MNIST Plot](./results/rotated_mnist/rotated_mnist_test_plot.png)
+![Rotated MNIST Plot](./imgs/rotated_mnist_test_plot.png)
 
 CelebA Experiment Results:
-![CelebA Plot](./results/celeba/celeba_test_plot.png)
+![CelebA Plot](./imgs/celeba_test_plot.png)
