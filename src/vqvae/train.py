@@ -8,9 +8,10 @@ from torch.utils.data import Dataset
 from src.vqvae.vqvae import VQVAE
 
 
-def get_vae(input_dim: int):
+def get_vae(input_dim: int, experiment_type: str):
     model = VQVAE(
-        input_dim,
+        input_dim=input_dim,
+        experiment_type=experiment_type,
     )
     return model
 

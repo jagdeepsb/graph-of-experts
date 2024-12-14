@@ -146,13 +146,20 @@ class KMeansImageClusterer(KMeansClusterer):
 
 
 class KMeansVQVAEClusterer(KMeansClusterer):
-    def __init__(self, n_clusters, dataset: Dataset, verbose=False, n_tries=10):
+    def __init__(
+        self,
+        n_clusters,
+        dataset: Dataset,
+        experiment_type: str,
+        verbose=False,
+        n_tries=10,
+    ):
         super().__init__(n_clusters, verbose, n_tries)
         self.vae = None
 
         # determine number of channels in input dim
         input_dim = dataset[0][0].shape[0]
-        self.vae = get_vae(input_dim=input_dim)
+        self.vae = get_vae(input_dim=input_dim, experiment_type=experiment_type)
 
     def fit(self, dataset: Dataset):
         """

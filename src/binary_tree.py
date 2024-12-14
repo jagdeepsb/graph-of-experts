@@ -121,14 +121,14 @@ class CelebAOracleRouter(PretrainedBinaryTreeRouter):
         )
 
     def get_path(
-        self, x: torch.Tensor, comb_attr_labels: torch.Tensor, **metadata_kwargs
+        self, x: torch.Tensor, oracle_metadata: torch.Tensor, **metadata_kwargs
     ):
         """
         Args:
         - x: (bs, ...)
         - comb_attr_labels: (bs,...)
         """
-        return self.mask_arr[comb_attr_labels]
+        return self.mask_arr[oracle_metadata]
 
 
 class LatentVariableRouter(PretrainedBinaryTreeRouter):
@@ -136,14 +136,16 @@ class LatentVariableRouter(PretrainedBinaryTreeRouter):
     Router which uses hierarchical clustering of learned (discrete) latent variable (using e.g., a VQ-VAE) to route data
     """
 
-    def __init__(self, depth: int, dataset: Dataset):
+    def __init__(self, depth: int, dataset: Dataset, experiment_type: str):
         super().__init__()
         self.depth = depth
         self.emb_to_path = []
 
         # self.clusterer = KMeansImageClusterer(n_clusters=2 ** (self.depth - 1))
         self.clusterer = KMeansVQVAEClusterer(
-            n_clusters=2 ** (self.depth - 1), dataset=dataset
+            n_clusters=2 ** (self.depth - 1),
+            dataset=dataset,
+            experiment_type=experiment_type,
         )
 
     def compute_codebook(self, dataset: Dataset):

@@ -11,6 +11,7 @@ class VQVAE(nn.Module):
     def __init__(
         self,
         input_dim,
+        experiment_type: str,
         h_dim: int = 32,
         res_h_dim: int = 32,
         n_res_layers: int = 2,
@@ -58,7 +59,7 @@ class VQVAE(nn.Module):
         return f"vqvae_{self.h_dim}_{self.res_h_dim}_{self.n_res_layers}"
 
     def get_save_path(self):
-        return os.path.join("checkpoints", "vae", str(self) + ".pt")
+        return os.path.join("checkpoints", "vae", "experiment_type", str(self) + ".pt")
 
     def get_embedding(self, x):
         z_e = self.encoder(x)
