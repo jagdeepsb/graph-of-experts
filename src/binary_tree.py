@@ -249,7 +249,8 @@ class BinaryTreeGoE(nn.Module):
         self.register_module("router", router)
 
     def forward(
-        self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor]
+        self, x: torch.Tensor, router_metadata: Dict[str, torch.Tensor],
+        take_random_path: bool = False
     ) -> torch.Tensor:
         """
         Args:
@@ -258,4 +259,7 @@ class BinaryTreeGoE(nn.Module):
             y: (batch_size, output_dim)
         """
         path_mask = self.router.get_path(x, **router_metadata)
+        if take_random_path:
+            path_mask = None
+            path_mask = torch.randint(0, 2, (x.shape[0], self._depth-1)).to(x.device)
         return self._root(x, path_mask)

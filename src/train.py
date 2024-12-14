@@ -53,7 +53,7 @@ def do_val_epoch(model, loader, epoch, device) -> float:
     return epoch_loss
 
 
-def get_accuracy(model, loader, device):
+def get_accuracy(model, loader, device, take_random_path=False) -> float:
     model.eval()
     total_samples = 0
     total_correct = 0
@@ -66,7 +66,7 @@ def get_accuracy(model, loader, device):
             "oracle_metadata": oracle_metadata,
         }
 
-        logits = model(x, router_metadata=metadata)  # (bs, num_digit_classes)
+        logits = model(x, router_metadata=metadata, take_random_path=take_random_path)  # (bs, num_digit_classes)
         prediction = torch.argmax(logits, dim=1)  # (bs,)
         total_samples += prediction.shape[0]
         total_correct += torch.sum(prediction == y).item()
